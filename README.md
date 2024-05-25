@@ -1,23 +1,81 @@
-/*
-  WebRadio Example
-  Very simple HTML app to control web streaming
-  
-  Copyright (C) 2017  Earle F. Philhower, III
+# Practica 7: Buses de comunicación III (I2S)
 
-  This program is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
+## Introducción
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+El objetivo de la practica actual es describir el funcionamiento del bus I2S y realizar una
+practica para comprender su funcionamiento
 
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+# Ejercicio Práctico A:
 
+## Descripción
+
+En esta práctica, hemos implementado la reproducción de audio desde la memoria interna del ESP32. Los datos de sonido se almacenan como una matriz en la RAM interna del ESP32 y se utiliza la placa de conexión de audio MAX98357 I2S para decodificar la señal digital en una señal analógica. Para ello, empleamos el protocolo I2S, que nos permite generar datos de sonido digital sin pérdida de calidad.
+
+## Código de la práctica A
+
+```cpp
+#include "AudioGeneratorAAC.h"
+#include "AudioOutputI2S.h"
+#include "AudioFileSourcePROGMEM.h"
+#include "sampleaac.h"
+
+AudioFileSourcePROGMEM *in;
+AudioGeneratorAAC *aac;
+AudioOutputI2S *out;
+
+void setup(){
+  Serial.begin(115200);
+  in = new AudioFileSourcePROGMEM(sampleaac, sizeof(sampleaac));
+  aac = new AudioGeneratorAAC();
+  out = new AudioOutputI2S();
+  out->SetGain(0.125);
+  out->SetPinout(26, 25, 22);
+  aac->begin(in, out);
+}
+
+void loop(){
+  if (aac->isRunning()) {
+    aac->loop();
+  } else {
+    aac->stop();
+    Serial.printf("Sound Generator\n");
+    delay(1000);
+  }
+}
+```
+
+## Explicación del Funcionamiento
+
+El código utiliza varias bibliotecas de audio para manejar la reproducción de sonido en el ESP32. Aquí se detalla el funcionamiento:
+
+1. Configuración Inicial:
+    - Se inicializa el puerto serie a una velocidad de 115200 baudios.
+    - Se crea una instancia de AudioFileSourcePROGMEM para manejar el archivo de sonido almacenado en la        memoria interna.
+    -  Se crea una instancia de AudioGeneratorAAC para decodificar los datos AAC.
+    - Se crea una instancia de AudioOutputI2S para manejar la salida de audio a través del protocolo I2S.
+    - Se establece el nivel de ganancia de salida.
+    - Se configuran los pines para la salida I2S.
+
+2. Bucle Principal:
+    - En el bucle principal, se verifica si el generador de audio (AAC) sigue funcionando.
+    - Si está funcionando, se llama al método loop() para continuar la reproducción.
+    - Si ha dejado de funcionar, se detiene el generador y se imprime un mensaje por el puerto serie.
+
+# Práctica B: Radio Web con ESP32
+
+## Descripción
+
+El objetivo de esta práctica es implementar una radio web utilizando un microcontrolador ESP8266. El sistema permitirá reproducir estaciones de radio en línea y ser controlado a través de una interfaz web sencilla. Los usuarios podrán cambiar la estación, ajustar el volumen y detener la reproducción mediante un navegador web.
+
+- Material Necesario
+    - Microcontrolador ESP32
+    - Computadora con entorno de desarrollo Arduino IDE
+    - Conexión WiFi
+
+## Código fuente
+
+`WebRadio.cpp`:
+```cpp
 #include <Arduino.h>
 #if defined(ARDUINO_ARCH_RP2040)
 void setup() {}
@@ -452,5 +510,26 @@ void loop()
     client.stop();
   }
 }
-
 #endif
+```
+
+### Análisis del código
+
+El código fuente permite al ESP8266 conectarse a una red WiFi, servir una página web y reproducir una estación de radio en línea. Aquí se explica cada parte importante del código:
+
+1. **Conexión WiFi**: Se utilizan las credenciales definidas para conectarse a la red WiFi en el `setup()`.
+
+2. **Servidor Web**: Se inicia un servidor web en el puerto 80. Este servidor espera peticiones HTTP y responde con la página principal o ejecuta comandos como cambiar la URL de la estación o ajustar el volumen.
+
+3. **Reproducción de Audio**:
+
+    - Se usan bibliotecas para manejar el streaming de audio (`AudioFileSourceICYStream`), el buffer (`AudioFileSourceBuffer`) y la decodificación (`AudioGeneratorMP3` y `AudioGeneratorAAC`).
+    - La función `StartNewURL()` inicializa la reproducción de la URL configurada.
+    - El manejo de la reproducción y la actualización del estado se realiza en el `loop()`.
+4. **Manejo de Peticiones HTTP**:
+
+    - `HandleIndex()`, `HandleStatus()`, `HandleTitle()`, `HandleVolume()`, `HandleChangeURL()`, y `HandleStop()` son funciones que manejan diferentes peticiones HTTP.
+    - `WebReadRequest()` analiza las peticiones entrantes y dirige al controlador adecuado.
+5. **Persistencia de Configuraciones**:
+
+    - La URL de la estación, el tipo de estación (MP3 o AAC) y el volumen se guardan en la EEPROM para que las configuraciones persistan después de un reinicio.
